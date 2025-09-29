@@ -1,0 +1,22 @@
+{
+  "name": "a11y-form-validator",
+  "version": "2.0.0",
+  "description": "A11y Form Validator - CDN-ready form validation library",
+  "main": "dist/index.js",
+  "files": [
+    "dist/"
+  ],
+  "keywords": [
+    "accessibility",
+    "form-validation",
+    "wcag",
+    "a11y",
+    "webflow"
+  ],
+  "author": "Brandon Mosco",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/QABrandon/a11y-form-validator-cdn.git"
+  }
+}
