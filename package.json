@@ -1,22 +1,41 @@
 {
   "name": "a11y-form-validator",
-  "version": "2.0.0",
-  "description": "A11y Form Validator - CDN-ready form validation library",
-  "main": "dist/index.js",
+  "version": "1.0.2",
+  "description": "A11y Form Validator - WCAG 2.2 AA compliant form validation library for Webflow",
+  "main": "index.js",
+  "module": "index.js",
+  "types": "index.d.ts",
   "files": [
-    "dist/"
+    "index.js",
+    "styles.css",
+    "index.d.ts",
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "accessibility",
     "form-validation",
     "wcag",
     "a11y",
-    "webflow"
+    "webflow",
+    "validation",
+    "forms",
+    "accessibility-compliance"
   ],
-  "author": "Brandon Mosco",
+  "author": "Brandon Mosco <bmosco612@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/QABrandon/a11y-form-validator-cdn.git"
+    "url": "https://github.com/QABrandon/a11y-form-validator-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/QABrandon/a11y-form-validator-app/issues"
+  },
+  "homepage": "https://github.com/QABrandon/a11y-form-validator-app#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

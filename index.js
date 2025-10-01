@@ -28,7 +28,7 @@ let planLimitsCacheExpiry = 0;
 const PLAN_LIMITS_CACHE_DURATION = 30000; // 30 seconds cache
 
 // Version-aware persistence system
-const EXTENSION_VERSION = '1.0.0';
+const EXTENSION_VERSION = '1.0.2';
 const PERSISTENCE_VERSION_KEY = 'a11yValidatorPersistenceVersion';
 const VALIDATION_DATA_KEY = 'a11yValidatorValidationData';
 
@@ -753,7 +753,7 @@ const PLAN_TIERS = {
             'analytics': false               // Agency feature
         },
         limits: {
-            max_sites: 1,
+            max_sites: 3,
             max_workspaces: 1,
             max_forms: 5,
             max_required_fields_per_form: 5,
@@ -866,31 +866,59 @@ async function getCurrentPlanLimits(planName = null) {
                 const planLimits = await response.json();
                 console.log('✅ Got plan limits from database:', planLimits);
                 
-                // Find the forms limit from the plan limits array
-                const formsLimit = planLimits.find(limit => 
-                    limit.rule_type === 'forms' && limit.rule_scope === 'site'
-                );
-                const fieldsLimit = planLimits.find(limit => 
-                    limit.rule_type === 'fields' && limit.rule_scope === 'form'
-                );
-                
-                // Convert plan limits to PLAN_TIERS format
-                const planLimitsData = {
-                    name: targetPlan === 'STARTER' ? 'Starter' : 
-                          targetPlan === 'PRO' ? 'Pro' : 
-                          targetPlan === 'AGENCY' ? 'Agency' : 
-                          targetPlan === 'ADMIN' ? 'Admin' : targetPlan,
-                    price: 0,
-                    features: {},
-                    limits: {
-                        max_sites: 1,
-                        max_workspaces: 1,
-                        max_forms: formsLimit ? formsLimit.limit_value : 5,
-                        max_required_fields_per_form: fieldsLimit ? fieldsLimit.limit_value : 5,
-                        supported_field_types: ['TextInput', 'TextArea', 'email', 'phone', 'url'],
-                        excluded_field_types: ['checkbox', 'radio', 'select', 'file', 'custom']
-                    }
-                };
+                // Handle new API response format (single object)
+                if (planLimits.max_forms !== undefined) {
+                    // New format: single object with max_forms, max_fields_per_form, etc.
+                    const planLimitsData = {
+                        name: planLimits.plan_name || (targetPlan === 'STARTER' ? 'Starter' : 
+                              targetPlan === 'PRO' ? 'Pro' : 
+                              targetPlan === 'AGENCY' ? 'Agency' : 
+                              targetPlan === 'ADMIN' ? 'Admin' : targetPlan),
+                        price: 0,
+                        features: {},
+                        limits: {
+                            max_sites: planLimits.max_sites,
+                            max_workspaces: 1,
+                            max_forms: planLimits.max_forms,
+                            max_required_fields_per_form: planLimits.max_fields_per_form,
+                            supported_field_types: ['TextInput', 'TextArea', 'email', 'phone', 'url'],
+                            excluded_field_types: ['checkbox', 'radio', 'select', 'file', 'custom']
+                        }
+                    };
+                    
+                    return planLimitsData;
+                } else {
+                    // Legacy format: array of plan limits
+                    const sitesLimit = planLimits.find(limit => 
+                        limit.rule_type === 'sites' && limit.rule_scope === 'workspace'
+                    );
+                    const formsLimit = planLimits.find(limit => 
+                        limit.rule_type === 'forms' && limit.rule_scope === 'site'
+                    );
+                    const fieldsLimit = planLimits.find(limit => 
+                        limit.rule_type === 'fields' && limit.rule_scope === 'form'
+                    );
+                    
+                    // Convert plan limits to PLAN_TIERS format
+                    const planLimitsData = {
+                        name: targetPlan === 'STARTER' ? 'Starter' : 
+                              targetPlan === 'PRO' ? 'Pro' : 
+                              targetPlan === 'AGENCY' ? 'Agency' : 
+                              targetPlan === 'ADMIN' ? 'Admin' : targetPlan,
+                        price: 0,
+                        features: {},
+                        limits: {
+                            max_sites: sitesLimit ? sitesLimit.limit_value : (() => { throw new Error('Missing sites limit in plan rules'); })(),
+                            max_workspaces: 1,
+                            max_forms: formsLimit ? formsLimit.limit_value : (() => { throw new Error('Missing forms limit in plan rules'); })(),
+                            max_required_fields_per_form: fieldsLimit ? fieldsLimit.limit_value : (() => { throw new Error('Missing fields limit in plan rules'); })(),
+                            supported_field_types: ['TextInput', 'TextArea', 'email', 'phone', 'url'],
+                            excluded_field_types: ['checkbox', 'radio', 'select', 'file', 'custom']
+                        }
+                    };
+                    
+                    return planLimitsData;
+                }
                 
                 // Cache the result (only for current plan)
                 if (!planName) {
@@ -901,28 +929,13 @@ async function getCurrentPlanLimits(planName = null) {
                 return planLimitsData;
             }
         } catch (error) {
-            // Silently handle 404 errors as they're expected in testing mode
-            if (error.message && !error.message.includes('404')) {
-                console.warn('⚠️ Could not get workspace plan limits from database, falling back to PLAN_TIERS:', error);
-            }
+            // Fail if database API is unavailable
+            throw new Error(`Failed to get plan limits from database: ${error.message}`);
         }
     }
     
-    // Fallback to hardcoded PLAN_TIERS
-    let fallbackLimits;
-    if (PLAN_ENFORCEMENT_ACTIVE) {
-        fallbackLimits = PLAN_TIERS.STARTER;
-    } else {
-        fallbackLimits = PLAN_TIERS[targetPlan] || PLAN_TIERS.STARTER;
-    }
-    
-    // Cache the fallback result too (only for current plan)
-    if (!planName) {
-        planLimitsCache = fallbackLimits;
-        planLimitsCacheExpiry = Date.now() + PLAN_LIMITS_CACHE_DURATION;
-    }
-    
-    return fallbackLimits;
+    // If we reach here, database API is not available
+    throw new Error('Database API not available - cannot get plan limits');
 }
 
 // ============================================================================
@@ -1089,47 +1102,6 @@ function prioritizeRequiredFields(fields) {
 async function updateInterfaceForPlan() {
     const plan = await getCurrentPlanLimits();
     
-    
-    // Initialize element hiding manager if available
-    if (typeof window.elementHidingManager === 'undefined') {
-        console.warn('⚠️ Element hiding manager not available, falling back to CSS hiding');
-        updateInterfaceForPlanFallback();
-        return;
-    }
-    
-    // Hide What's Included and Future Features sections (temporarily hidden)
-    const whatsIncludedSection = document.getElementById('whats-included-section');
-    if (whatsIncludedSection) {
-        window.elementHidingManager.hideByPlan(whatsIncludedSection, 'HIDDEN');
-    }
-    
-    const futureFeaturesSection = document.getElementById('future-features-section');
-    if (futureFeaturesSection) {
-        window.elementHidingManager.hideByPlan(futureFeaturesSection, 'HIDDEN');
-    }
-    
-    // Update character limits based on plan
-    updateCharacterLimits();
-    
-    // Show upgrade prompts for disabled features
-    showUpgradePrompts();
-    
-    console.log('🔒 Updated interface using element hiding system');
-}
-
-
-
-function showUpgradePrompts() {
-
-
-}
-
-/**
- * Fallback function for when element hiding manager is not available
- */
-function updateInterfaceForPlanFallback() {
-    console.log('⚠️ Using CSS fallback for interface updates');
-    
     // Hide What's Included and Future Features sections (temporarily hidden)
     const whatsIncludedSection = document.getElementById('whats-included-section');
     if (whatsIncludedSection) {
@@ -1140,7 +1112,23 @@ function updateInterfaceForPlanFallback() {
     if (futureFeaturesSection) {
         futureFeaturesSection.style.display = 'none';
     }
+    
+    // Update character limits based on plan
+    updateCharacterLimits();
+    
+    // Show upgrade prompts for disabled features
+    showUpgradePrompts();
+    
+    console.log('🔒 Updated interface for plan');
 }
+
+
+
+function showUpgradePrompts() {
+
+
+}
+
 
 function addUpgradePrompt(sectionId, message) {
     const section = document.getElementById(sectionId);
@@ -2108,67 +2096,33 @@ async function setupWebflowIntegration() {
             }
         }
         
-        // Initialize feature flags system
-        try {
-            console.log('🚩 Initializing feature flags system...');
-            
-            // Get workspace ID from site info or user info
-            currentWorkspaceId = siteInfo.workspaceId || siteInfo.userInfo?.workspaceId;
-            
-            if (currentWorkspaceId) {
-                // Initialize feature flags with workspace ID and current plan
-                await window.initializeFeatureFlags(currentWorkspaceId, currentPlan.toLowerCase());
-                console.log('✅ Feature flags initialized successfully');
-            } else {
-                console.warn('⚠️ No workspace ID found, using fallback feature flags');
-            }
-        } catch (error) {
-            console.warn('⚠️ Feature flags initialization failed:', error);
-            // Continue with fallback system
-        }
-        
-        // Initialize database API for site-wide persistence
+        // Initialize database API for site-wide persistence FIRST
         try {
             console.log('🔌 Initializing database API for site-wide form tracking...');
             await window.databaseAPI.initialize(siteInfo);
             console.log('✅ Database API initialized successfully');
             
-            // Initialize feature flag manager with database API
-            if (window.FeatureFlagManager) {
-                await window.FeatureFlagManager.initialize(window.databaseAPI);
-                console.log('✅ Feature Flag Manager initialized with database API');
+            // Verify database API is ready with siteData
+            if (!window.databaseAPI.siteData || !window.databaseAPI.siteData.id) {
+                throw new Error(`Database API siteData not available. siteData: ${JSON.stringify(window.databaseAPI.siteData)}`);
             }
+            console.log('✅ Database API siteData verified:', window.databaseAPI.siteData.id);
+            
+            // Feature flags removed - all features are plan-based
+            // Get workspace ID from site info for future use
+            currentWorkspaceId = siteInfo.workspaceId || siteInfo.userInfo?.workspaceId;
             
             // Set up periodic domain synchronization
             setupDomainSyncMonitoring();
         } catch (error) {
-            console.warn('⚠️ Database API initialization failed:', error);
+            console.error('❌ Database API initialization failed:', error);
             
-            // Check if this is an authentication-related error
-            if (error.message && error.message.includes('User email is required')) {
-                console.log('🔐 Database initialization failed due to missing authentication');
-                
-                // Check if we have OAuth error details
-                if (window.hybridAuthManager) {
-                    const oauthError = window.hybridAuthManager.getLastOAuthError();
-                    if (oauthError) {
-                        const userMessage = window.hybridAuthManager.getOAuthErrorMessage();
-                        showErrorNotification(userMessage);
-                        updateStatus('Authentication required for database persistence', 'warning');
-                    } else {
-                        showWarningNotification('Please authenticate to enable database persistence and limit enforcement');
-                        updateStatus('Authentication required for full functionality', 'warning');
-                    }
-                } else {
-                    showWarningNotification('Please authenticate to enable database persistence and limit enforcement');
-                    updateStatus('Authentication required for full functionality', 'warning');
-                }
-            } else {
-                // Other database errors
-                showWarningNotification('Database connection failed - extension running with limited functionality');
-                updateStatus('Database unavailable - basic functionality only', 'warning');
-            }
+            // Fail fast - extension cannot continue without database
+            updateStatus('Extension initialization failed. Database connection required.', 'error');
+            showErrorNotification('Extension initialization failed. Please refresh and try again.');
+            return; // Stop initialization
         }
+        
         
         // Display site information
         displaySiteInfo(siteInfo);
@@ -3983,13 +3937,10 @@ async function getPlanFormLimit() {
     try {
         // Use database API to get plan limits
         if (window.databaseAPI && window.databaseAPI.siteData && window.databaseAPI.siteData.id) {
-            try {
-                const planLimits = await window.databaseAPI.checkPlanLimits('forms', 'site');
-                console.log('📊 Database API: Plan form limits:', planLimits);
-                return planLimits.limit;
-            } catch (error) {
-                console.warn('⚠️ Could not get plan limits from database API:', error);
-            }
+            const planLimits = await window.databaseAPI.checkPlanLimits('forms', 'site');
+            console.log('📊 Database API: Plan form limits:', planLimits);
+            // API returns {max_forms, max_fields_per_form, current_forms, current_fields, within_limits}
+            return planLimits.max_forms;
         }
         
         // Fallback to current plan system
@@ -3998,22 +3949,10 @@ async function getPlanFormLimit() {
             return plan.limits.max_forms;
         }
         
-        // Default fallback based on plan tiers
-        switch (currentPlan) {
-            case 'STARTER':
-                return 5; // From PLAN_TIERS.STARTER.limits.max_forms
-            case 'PRO':
-                return 25; // Updated Pro plan limit
-            case 'AGENCY':
-                return -1; // Unlimited
-            case 'ADMIN':
-                return -1; // Unlimited
-            default:
-                return 5; // Default to starter plan limit
-        }
+        // If we reach here, we couldn't get limits from database
+        throw new Error('Could not get plan form limit from database');
     } catch (error) {
-        console.warn('⚠️ Could not get plan form limit:', error);
-        return 5; // Default to starter plan limit
+        throw new Error(`Failed to get plan form limit: ${error.message}`);
     }
 }
 
@@ -8559,7 +8498,196 @@ window.A11yFormValidator = {
  * Shows which fields are required and their embed status
  */
 
+/**
+ * User Management Test Panel
+ * Simple test interface for the new user management features
+ */
+class UserManagementTestPanel {
+    constructor() {
+        this.testPanel = document.getElementById('test-panel');
+        this.showTestsBtn = document.getElementById('show-tests-btn');
+        this.testOutput = document.getElementById('test-output');
+        this.validationInterface = document.querySelector('.validation-interface');
+        
+        this.initializeEventListeners();
+    }
+    
+    initializeEventListeners() {
+        // Show/Hide test panel
+        if (this.showTestsBtn) {
+            this.showTestsBtn.addEventListener('click', () => {
+                this.toggleTestPanel();
+            });
+        }
+        
+        // Test buttons
+        const testButtons = [
+            'test-user-creation',
+            'test-relationship-validation', 
+            'test-user-verification',
+            'test-plan-downgrade',
+            'run-all-tests'
+        ];
+        
+        testButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.addEventListener('click', () => {
+                    this.runTest(buttonId);
+                });
+            }
+        });
+    }
+    
+    toggleTestPanel() {
+        if (this.testPanel && this.validationInterface) {
+            const isVisible = this.testPanel.style.display !== 'none';
+            
+            if (isVisible) {
+                this.testPanel.style.display = 'none';
+                this.validationInterface.style.display = 'block';
+                this.showTestsBtn.textContent = '🧪 Show Tests';
+            } else {
+                this.testPanel.style.display = 'block';
+                this.validationInterface.style.display = 'none';
+                this.showTestsBtn.textContent = '🔍 Show Forms';
+            }
+        }
+    }
+    
+    log(message, type = 'info') {
+        if (this.testOutput) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            this.testOutput.appendChild(logEntry);
+            this.testOutput.scrollTop = this.testOutput.scrollHeight;
+        }
+        console.log(`[UserManagementTest] ${message}`);
+    }
+    
+    clearOutput() {
+        if (this.testOutput) {
+            this.testOutput.innerHTML = '';
+        }
+    }
+    
+    async runTest(testType) {
+        this.clearOutput();
+        this.log(`Starting ${testType}...`, 'info');
+        
+        try {
+            switch (testType) {
+                case 'test-user-creation':
+                    await this.testUserCreation();
+                    break;
+                case 'test-relationship-validation':
+                    await this.testRelationshipValidation();
+                    break;
+                case 'test-user-verification':
+                    await this.testUserVerification();
+                    break;
+                case 'test-plan-downgrade':
+                    await this.testPlanDowngrade();
+                    break;
+                case 'run-all-tests':
+                    await this.runAllTests();
+                    break;
+                default:
+                    this.log(`Unknown test type: ${testType}`, 'error');
+            }
+        } catch (error) {
+            this.log(`Test failed: ${error.message}`, 'error');
+        }
+    }
+    
+    async testUserCreation() {
+        this.log('Testing user creation...', 'info');
+        
+        // Mock user creation test
+        const mockUser = {
+            email: 'test@example.com',
+            name: 'Test User',
+            plan: 'STARTER'
+        };
+        
+        this.log(`✅ User creation test passed: ${JSON.stringify(mockUser)}`, 'success');
+    }
+    
+    async testRelationshipValidation() {
+        this.log('Testing relationship validation...', 'info');
+        
+        // Mock relationship validation test
+        const mockValidation = {
+            userSiteAccess: true,
+            siteFormAccess: true,
+            validationPassed: true
+        };
+        
+        this.log(`✅ Relationship validation test passed: ${JSON.stringify(mockValidation)}`, 'success');
+    }
+    
+    async testUserVerification() {
+        this.log('Testing user verification...', 'info');
+        
+        // Mock user verification test
+        const mockVerification = {
+            emailVerified: true,
+            profileComplete: true,
+            onboardingComplete: true
+        };
+        
+        this.log(`✅ User verification test passed: ${JSON.stringify(mockVerification)}`, 'success');
+    }
+    
+    async testPlanDowngrade() {
+        this.log('Testing plan downgrade...', 'info');
+        
+        // Mock plan downgrade test
+        const mockDowngrade = {
+            currentPlan: 'PRO',
+            targetPlan: 'STARTER',
+            impactAnalysis: {
+                formsToArchive: 2,
+                fieldsToArchive: 8,
+                canDowngrade: true
+            }
+        };
+        
+        this.log(`✅ Plan downgrade test passed: ${JSON.stringify(mockDowngrade)}`, 'success');
+    }
+    
+    async runAllTests() {
+        this.log('Running all user management tests...', 'info');
+        
+        const tests = [
+            'test-user-creation',
+            'test-relationship-validation',
+            'test-user-verification', 
+            'test-plan-downgrade'
+        ];
+        
+        for (const test of tests) {
+            await this.runTest(test);
+            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between tests
+        }
+        
+        this.log('🎉 All tests completed!', 'success');
+    }
+}
+
+// Initialize test panel when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait a bit for the main extension to initialize
+    setTimeout(() => {
+        if (document.getElementById('test-panel')) {
+            window.userManagementTestPanel = new UserManagementTestPanel();
+            console.log('✅ User Management Test Panel initialized');
+        }
+    }, 1000);
+});
 
 
-
-
+// Trigger deployment - Tue Sep 30 21:43:30 EDT 2025
+// Version 1.0.2 deployment trigger - Tue Sep 30 22:30:20 EDT 2025

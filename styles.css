@@ -215,12 +215,13 @@ input, textarea, select {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
 }
 
 .panel-header.expanded-view .size-controls {
     margin-right: 0;
     margin-bottom: 0;
+    height: 100%;
 }
 
 /* Site Page Info Layout - block layout with right border */
@@ -228,7 +229,7 @@ input, textarea, select {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
 }
 
 /* Site Page Info Content - block layout */
@@ -1559,4 +1560,97 @@ input, textarea, select {
     opacity: 0.5;
     cursor: not-allowed;
     color: #6c757d;
+}
+
+/* ============================================================================
+   TEST PANEL STYLES
+   ============================================================================ */
+
+
+.test-controls .btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    height: auto;
+    min-height: 36px;
+}
+
+#run-all-tests.btn {
+    font-weight: 600;
+    color: white;
+}
+
+.test-panel {
+    background: var(--background2);
+    border: 1px solid var(--border1);
+    border-radius: 8px;
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+.test-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 15px 20px 0 20px;
+}
+
+.test-buttons .btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+.test-results {
+    background: var(--background3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 20px 15px 20px;
+    margin: 0 20px 20px 20px;
+}
+
+.test-results h3 {
+    color: white;
+    text-decoration: underline;
+    margin: 0 0 10px 0;
+    font-size: 14px;
+}
+
+.test-output {
+    background: var(--background1);
+    border: 1px solid var(--border3);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    color: var(--text2);
+}
+
+.test-output .success {
+    color: var(--greenText);
+}
+
+.test-output .error {
+    color: var(--redText);
+}
+
+.test-output .info {
+    color: var(--text2);
+}
+
+.test-panel .section-content {
+    padding: 0;
+}
+
+.test-panel .section-content h2 {
+    padding: 15px 20px 0 20px;
+    margin: 0 0 10px 0;
+}
+
+.test-panel .section-description {
+    padding: 0 20px 10px 20px;
+    margin: 0;
 }
