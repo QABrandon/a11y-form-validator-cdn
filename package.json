@@ -4,10 +4,8 @@
   "description": "A11y Form Validator - WCAG 2.2 AA compliant form validation library for Webflow",
   "main": "standalone-validator.js",
   "module": "standalone-validator.js",
-  "types": "index.d.ts",
   "files": [
     "standalone-validator.js",
-    "index.d.ts",
     "README.md",
     "LICENSE"
   ],
