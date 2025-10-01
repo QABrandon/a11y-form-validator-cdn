@@ -58,7 +58,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](https://github.com/QABrandon/a11y-form-validator-cdn/blob/main/CONTRIBUTING.md) for details.
+Contributions are welcome! Please report issues or submit pull requests to our [CDN Repository](https://github.com/QABrandon/a11y-form-validator-cdn).
 
 ---
 
