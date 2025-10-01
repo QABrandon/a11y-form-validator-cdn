@@ -5844,6 +5844,11 @@ function generatePageLevelValidationScript(settings) {
 <!-- This script provides field-level validation for forms configured with the A11y Form Validator Extension -->
 <!-- It fetches validation rules from the database and applies them to forms on the page -->
 
+<script>
+// Configure Supabase credentials for standalone validator
+window.SUPABASE_URL = 'https://mamibgixunlyttgjwefi.supabase.co';
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hbWliZ2l4dW5seXR0Z2p3ZWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NDU4NzIsImV4cCI6MjA3NDMyMTg3Mn0.7W9R67_J5Fh7JnKWgC8-ZjVJNCRzp7kR76K3BM_d7k0';
+</script>
 <script src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"></script>
     `;
 }
@@ -5855,6 +5860,11 @@ function generateValidationScript(formId, settings) {
 <!-- This script provides field-level validation for forms configured with the A11y Form Validator Extension -->
 <!-- It fetches validation rules from the database and applies them to forms on the page -->
 
+<script>
+// Configure Supabase credentials for standalone validator
+window.SUPABASE_URL = 'https://mamibgixunlyttgjwefi.supabase.co';
+window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hbWliZ2l4dW5seXR0Z2p3ZWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NDU4NzIsImV4cCI6MjA3NDMyMTg3Mn0.7W9R67_J5Fh7JnKWgC8-ZjVJNCRzp7kR76K3BM_d7k0';
+</script>
 <script src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"></script>
     `;
 }

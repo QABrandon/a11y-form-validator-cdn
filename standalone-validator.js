@@ -3,7 +3,7 @@
  * 
  * This script provides field-level validation for Webflow forms that have been
  * configured with the A11y Form Validator Extension. It reads the custom attributes
- * added by the extension and applies appropriate validation rules.
+ * added by the extension and applies appropriate validation rules from the database.
  * 
  * Version: 1.0.2
  * CDN: https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js
@@ -13,6 +13,17 @@
     'use strict';
     
     console.log('🔧 A11y Form Validator - Standalone Script Loading... v1.0.2');
+    
+    // ===== CONFIGURATION =====
+    
+    // Supabase configuration (auto-detected from site or provided via extension)
+    const SUPABASE_URL = window.SUPABASE_URL || null;
+    const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || null;
+    
+    // Validation rules cache
+    let validationRulesCache = new Map();
+    let cacheExpiry = new Map();
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
     
     // ===== CONFIGURATION =====
     
@@ -27,6 +38,169 @@
         minlength: 'Please enter at least {min} characters',
         maxlength: 'Please enter no more than {max} characters'
     };
+    
+    // ===== DATABASE INTEGRATION =====
+    
+    /**
+     * Fetch validation rules for a form from the database
+     */
+    async function fetchValidationRules(formId) {
+        // Check cache first
+        const cacheKey = formId;
+        const now = Date.now();
+        
+        if (validationRulesCache.has(cacheKey) && 
+            cacheExpiry.has(cacheKey) && 
+            now < cacheExpiry.get(cacheKey)) {
+            console.log('📋 Using cached validation rules for form:', formId);
+            return validationRulesCache.get(cacheKey);
+        }
+        
+        try {
+            console.log('🔍 Fetching validation rules for form:', formId);
+            
+            // Try to fetch from database first
+            if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/validation_rules?form_id=eq.${formId}&is_active=eq.true&order=order_index.asc`, {
+                    headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const rules = await response.json();
+                    console.log('✅ Fetched validation rules from database:', rules.length);
+                    
+                    // Transform database rules to our format
+                    const transformedRules = rules.map(rule => ({
+                        field_name: rule.field_name,
+                        rules: [{
+                            rule_type: rule.rule_type,
+                            rule_config: rule.rule_config,
+                            error_message: rule.error_message,
+                            is_active: rule.is_active
+                        }]
+                    }));
+                    
+                    // Cache the results
+                    validationRulesCache.set(cacheKey, transformedRules);
+                    cacheExpiry.set(cacheKey, now + CACHE_DURATION);
+                    
+                    return transformedRules;
+                } else {
+                    console.warn('⚠️ Database fetch failed, falling back to attributes');
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to fetch validation rules from database:', error);
+        }
+        
+        // Fallback to attribute-based rules
+        const rules = await fetchValidationRulesFromAttributes(formId);
+        
+        // Cache the fallback results
+        validationRulesCache.set(cacheKey, rules);
+        cacheExpiry.set(cacheKey, now + CACHE_DURATION);
+        
+        return rules;
+    }
+    
+    /**
+     * Fallback: Extract validation rules from form attributes (set by extension)
+     */
+    async function fetchValidationRulesFromAttributes(formId) {
+        const form = document.querySelector(`[data-form-id="${formId}"]`) || 
+                    document.querySelector(`#${formId}`) ||
+                    document.querySelector(`form[name="${formId}"]`);
+        
+        if (!form) {
+            console.warn('⚠️ Form not found for ID:', formId);
+            return [];
+        }
+        
+        const rules = [];
+        const fields = form.querySelectorAll('input, textarea, select');
+        
+        fields.forEach(field => {
+            const fieldName = field.name || field.id || 'unnamed-field';
+            const fieldRules = [];
+            
+            // Extract rules from data attributes (set by extension)
+            if (field.hasAttribute('required')) {
+                fieldRules.push({
+                    rule_type: 'required',
+                    error_message: field.getAttribute('data-error-required') || `${getFieldLabel(field)} is required`,
+                    is_active: true
+                });
+            }
+            
+            if (field.type === 'email') {
+                fieldRules.push({
+                    rule_type: 'email',
+                    error_message: field.getAttribute('data-error-email') || 'Please enter a valid email address',
+                    is_active: true
+                });
+            }
+            
+            if (field.type === 'tel') {
+                fieldRules.push({
+                    rule_type: 'phone',
+                    error_message: field.getAttribute('data-error-phone') || 'Please enter a valid phone number',
+                    is_active: true
+                });
+            }
+            
+            if (field.type === 'url') {
+                fieldRules.push({
+                    rule_type: 'url',
+                    error_message: field.getAttribute('data-error-url') || 'Please enter a valid URL',
+                    is_active: true
+                });
+            }
+            
+            const minLength = field.getAttribute('minlength') || field.getAttribute('data-min-length');
+            if (minLength) {
+                fieldRules.push({
+                    rule_type: 'min_length',
+                    rule_config: { value: parseInt(minLength) },
+                    error_message: field.getAttribute('data-error-minlength') || `Must be at least ${minLength} characters`,
+                    is_active: true
+                });
+            }
+            
+            const maxLength = field.getAttribute('maxlength') || field.getAttribute('data-max-length');
+            if (maxLength) {
+                fieldRules.push({
+                    rule_type: 'max_length',
+                    rule_config: { value: parseInt(maxLength) },
+                    error_message: field.getAttribute('data-error-maxlength') || `Must be no more than ${maxLength} characters`,
+                    is_active: true
+                });
+            }
+            
+            const pattern = field.getAttribute('pattern') || field.getAttribute('data-pattern');
+            if (pattern) {
+                fieldRules.push({
+                    rule_type: 'pattern',
+                    rule_config: { pattern: pattern },
+                    error_message: field.getAttribute('data-error-pattern') || 'Format is invalid',
+                    is_active: true
+                });
+            }
+            
+            if (fieldRules.length > 0) {
+                rules.push({
+                    field_name: fieldName,
+                    rules: fieldRules
+                });
+            }
+        });
+        
+        console.log('📋 Extracted validation rules from attributes:', rules);
+        return rules;
+    }
     
     // ===== HELPER FUNCTIONS =====
     
@@ -149,79 +323,83 @@
     }
     
     /**
-     * Validate individual field based on its attributes
+     * Validate individual field using database rules
      */
-    function validateField(field) {
+    async function validateField(field, formId) {
         let isValid = true;
         let errorMessage = '';
         
-        // Get field label for specific error messages
-        const fieldLabel = getFieldLabel(field);
+        // Get field name
+        const fieldName = field.name || field.id || 'unnamed-field';
         
-        // Required validation
-        if (field.hasAttribute('required') && !field.value.trim()) {
-            isValid = false;
-            errorMessage = getFieldSpecificMessage('required', fieldLabel);
+        // Get validation rules for this field
+        const formRules = await fetchValidationRules(formId);
+        const fieldRules = formRules.find(rule => rule.field_name === fieldName);
+        
+        if (!fieldRules || !fieldRules.rules) {
+            console.warn('⚠️ No validation rules found for field:', fieldName);
+            return true; // No rules = valid
         }
         
-        // Email validation
-        if (field.type === 'email' && field.value) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(field.value)) {
-                isValid = false;
-                errorMessage = getFieldSpecificMessage('email', fieldLabel);
+        // Apply each rule
+        for (const rule of fieldRules.rules) {
+            if (!rule.is_active) continue;
+            
+            const fieldValue = field.value || '';
+            const ruleType = rule.rule_type;
+            const ruleConfig = rule.rule_config || {};
+            
+            let ruleValid = true;
+            
+            switch (ruleType) {
+                case 'required':
+                    if (!fieldValue.trim()) {
+                        ruleValid = false;
+                    }
+                    break;
+                    
+                case 'email':
+                    if (fieldValue && !isValidEmail(fieldValue)) {
+                        ruleValid = false;
+                    }
+                    break;
+                    
+                case 'phone':
+                    if (fieldValue && !isValidPhone(fieldValue)) {
+                        ruleValid = false;
+                    }
+                    break;
+                    
+                case 'url':
+                    if (fieldValue && !isValidUrl(fieldValue)) {
+                        ruleValid = false;
+                    }
+                    break;
+                    
+                case 'min_length':
+                    if (fieldValue && fieldValue.length < ruleConfig.value) {
+                        ruleValid = false;
+                    }
+                    break;
+                    
+                case 'max_length':
+                    if (fieldValue && fieldValue.length > ruleConfig.value) {
+                        ruleValid = false;
+                    }
+                    break;
+                    
+                case 'pattern':
+                    if (fieldValue && !new RegExp(ruleConfig.pattern).test(fieldValue)) {
+                        ruleValid = false;
+                    }
+                    break;
             }
-        }
-        
-        // Phone validation
-        if (field.type === 'tel' && field.value) {
-            const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-            const cleanPhone = field.value.replace(/[\s\-\(\)\.]/g, '');
-            if (!phoneRegex.test(cleanPhone)) {
+            
+            if (!ruleValid) {
                 isValid = false;
-                errorMessage = getFieldSpecificMessage('phone', fieldLabel);
+                errorMessage = rule.error_message || `${fieldName} is invalid`;
+                break; // Stop at first error
             }
-        }
-        
-        // URL validation
-        if (field.type === 'url' && field.value) {
-            try {
-                new URL(field.value);
-            } catch (e) {
-                isValid = false;
-                errorMessage = getFieldSpecificMessage('url', fieldLabel);
-            }
-        }
-        
-        // Number validation
-        if (field.type === 'number' && field.value) {
-            if (isNaN(field.value)) {
-                isValid = false;
-                errorMessage = getFieldSpecificMessage('number', fieldLabel);
-            }
-        }
-        
-        // Date validation
-        if (field.type === 'date' && field.value) {
-            const date = new Date(field.value);
-            if (isNaN(date.getTime())) {
-                isValid = false;
-                errorMessage = getFieldSpecificMessage('date', fieldLabel);
-            }
-        }
-        
-        // Minlength validation
-        const minLength = field.getAttribute('data-min-length');
-        if (minLength && field.value.length < parseInt(minLength)) {
-            isValid = false;
-            errorMessage = getFieldSpecificMessage('minlength', fieldLabel, { min: minLength });
-        }
-        
-        // Maxlength validation
-        const maxLength = field.getAttribute('data-max-length');
-        if (maxLength && field.value.length > parseInt(maxLength)) {
-            isValid = false;
-            errorMessage = getFieldSpecificMessage('maxlength', fieldLabel, { max: maxLength });
         }
         
         // Show or hide error
@@ -235,17 +413,42 @@
     }
     
     /**
+     * Validation helper functions
+     */
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+    
+    function isValidPhone(phone) {
+        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+        const cleanPhone = phone.replace(/[\s\-\(\)\.]/g, '');
+        return phoneRegex.test(cleanPhone);
+    }
+    
+    function isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    /**
      * Validate all fields in a form
      */
-    function validateForm(form) {
+    async function validateForm(form) {
         const fields = form.querySelectorAll('input, textarea, select');
         let isValid = true;
         
-        fields.forEach(field => {
-            if (!validateField(field)) {
+        const formId = form.id || form.name || form.getAttribute('data-form-id') || 'unnamed';
+        
+        for (const field of fields) {
+            if (!(await validateField(field, formId))) {
                 isValid = false;
             }
-        });
+        }
         
         return isValid;
     }
@@ -254,21 +457,22 @@
      * Initialize validation for a form
      */
     function initializeFormValidation(form) {
-        console.log('📋 Initializing validation for form:', form.id || 'unnamed');
+        const formId = form.id || form.name || form.getAttribute('data-form-id') || 'unnamed';
+        console.log('📋 Initializing validation for form:', formId);
         
         // Add real-time validation
         const fields = form.querySelectorAll('input, textarea, select');
         fields.forEach(field => {
             // Validate on blur (when user leaves field)
-            field.addEventListener('blur', () => {
-                validateField(field);
+            field.addEventListener('blur', async () => {
+                await validateField(field, formId);
             });
             
             // Validate on input (for real-time feedback)
-            field.addEventListener('input', () => {
+            field.addEventListener('input', async () => {
                 // Only validate if field has been touched (has focus history)
                 if (field.dataset.touched === 'true') {
-                    validateField(field);
+                    await validateField(field, formId);
                 }
             });
             
@@ -279,9 +483,12 @@
         });
         
         // Validate on form submit
-        form.addEventListener('submit', (e) => {
-            if (!validateForm(form)) {
-                e.preventDefault();
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Always prevent default to allow async validation
+            
+            const isValid = await validateForm(form);
+            
+            if (!isValid) {
                 console.log('❌ Form validation failed');
                 
                 // Focus first invalid field
@@ -294,6 +501,20 @@
                 }
             } else {
                 console.log('✅ Form validation passed');
+                
+                // Re-enable form submission
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                Object.defineProperty(submitEvent, 'target', { value: form });
+                Object.defineProperty(submitEvent, 'currentTarget', { value: form });
+                
+                // Remove our event listener temporarily
+                form.removeEventListener('submit', arguments.callee);
+                
+                // Submit the form
+                form.submit();
+                
+                // Re-add event listener for future submissions
+                form.addEventListener('submit', arguments.callee);
             }
         });
     }
