@@ -1,65 +1,26 @@
-# A11y Form Validator
+# A11y Form Validator - CDN Package
 
-A comprehensive, WCAG 2.2 AA compliant form validation library designed specifically for Webflow forms.
+This is the public CDN package for the A11y Form Validator.
 
-## 🚀 Quick Start
-
-### CDN Usage (Recommended)
+## Usage
 
 ```html
-<!-- A11y Form Validator - Auto-detects site configuration -->
-<script src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"></script>
+<!-- Basic usage -->
+<script src="https://cdn.jsdelivr.net/gh/QABrandon/a11y-form-validator-cdn@latest/dist/index.js" data-site-id="your-site-id"></script>
 ```
 
-## ✨ Features
+## Features
 
-- ✅ **WCAG 2.2 AA Compliant** - Meets accessibility standards
-- ✅ **Real-time Validation** - Instant feedback as users type
-- ✅ **Custom Error Messages** - Personalized validation messages
-- ✅ **Plan-based Features** - Starter, Pro, and Agency tiers
-- ✅ **Webflow Optimized** - Designed specifically for Webflow forms
-- ✅ **Lightweight** - Minimal impact on page performance
-- ✅ **Auto-Configuration** - Automatically detects site settings
+- WCAG 2.2 AA compliant form validation
+- Real-time validation
+- Custom error messages
+- Accessibility features
+- Plan-based feature gating
 
-## 📋 Usage
+## Documentation
 
-### Basic Implementation
+For full documentation, visit: https://github.com/QABrandon/a11y-form-validator-app
 
-```html
-<form>
-  <input type="text" name="name" required>
-  <input type="email" name="email" required>
-  <button type="submit">Submit</button>
-</form>
+## License
 
-<script src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"></script>
-```
-
-### Advanced Configuration
-
-```html
-<script 
-  src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"
-  data-plan="pro"
-  data-real-time="true"
-  data-accessibility-mode="wcag-aa">
-</script>
-```
-
-## 🔗 Links
-
-- **Documentation**: [CDN Repository](https://github.com/QABrandon/a11y-form-validator-cdn)
-- **Issues**: [Report Issues](https://github.com/QABrandon/a11y-form-validator-cdn/issues)
-- **Website**: [A11y Form Validator](https://app.a11yformvalidator.com)
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please report issues or submit pull requests to our [CDN Repository](https://github.com/QABrandon/a11y-form-validator-cdn).
-
----
-
-**Made with ❤️ for accessibility and Webflow**
+MIT License - see LICENSE file for details.

@@ -5,9 +5,7 @@
   "main": "standalone-validator.js",
   "module": "standalone-validator.js",
   "files": [
-    "standalone-validator.js",
-    "README.md",
-    "LICENSE"
+    "standalone-validator.js"
   ],
   "keywords": [
     "accessibility",
@@ -34,5 +32,21 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "jquery": "^3.7.1",
+    "jquery-validation": "^1.21.0"
+  },
+  "peerDependencies": {
+    "jquery": ">=3.0.0",
+    "jquery-validation": ">=1.19.0"
+  },
+  "peerDependenciesMeta": {
+    "jquery": {
+      "optional": false
+    },
+    "jquery-validation": {
+      "optional": false
+    }
   }
 }
