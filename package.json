@@ -1,7 +1,7 @@
 {
-  "name": "a11y-form-validator",
-  "version": "1.0.17",
-  "description": "A11y Form Validator - WCAG 2.2 AA compliant form validation library for Webflow",
+  "name": "a11y-form-validator-lib",
+  "version": "1.0.20",
+  "description": "A11y Form Validator - WCAG 2.2 AA compliant form validation library for Webflow forms",
   "main": "standalone-validator.js",
   "module": "standalone-validator.js",
   "files": [
@@ -17,13 +17,15 @@
     "webflow",
     "validation",
     "forms",
-    "accessibility-compliance"
+    "accessibility-compliance",
+    "html5-validation",
+    "custom-validation"
   ],
   "author": "Brandon Mosco <bmosco612@gmail.com>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/QABrandon/a11y-form-validator-app.git"
+    "url": "git+https://github.com/QABrandon/a11y-form-validator-app.git"
   },
   "bugs": {
     "url": "https://github.com/QABrandon/a11y-form-validator-app/issues"
@@ -34,5 +36,20 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "peerDependencies": {
+    "jquery": ">=3.0.0",
+    "jquery-validation": ">=1.19.0"
+  },
+  "peerDependenciesMeta": {
+    "jquery": {
+      "optional": false
+    },
+    "jquery-validation": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
   }
 }
