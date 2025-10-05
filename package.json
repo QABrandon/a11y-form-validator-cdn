@@ -1,6 +1,6 @@
 {
   "name": "a11y-form-validator-lib",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "A11y Form Validator - WCAG 2.2 AA compliant form validation library for Webflow forms",
   "main": "standalone-validator.js",
   "module": "standalone-validator.js",
