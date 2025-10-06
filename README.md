@@ -16,7 +16,7 @@ A WCAG 2.2 AA conformant form validation library designed specifically for Webfl
 
 ### CDN
 ```html
-<script src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/a11y-form-validator-lib@latest/standalone-validator.js"></script>
 ```
 
 ## 🚀 Quick Start
@@ -30,7 +30,7 @@ A WCAG 2.2 AA conformant form validation library designed specifically for Webfl
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.21.0/additional-methods.min.js"></script>
     
     <!-- A11y Form Validator -->
-    <script src="https://cdn.jsdelivr.net/npm/a11y-form-validator@latest/standalone-validator.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/a11y-form-validator-lib@latest/standalone-validator.js"></script>
 ```
 
 
