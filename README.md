@@ -14,30 +14,42 @@ A WCAG 2.2 AA conformant form validation library designed specifically for Webfl
 ## 📦 Installation
 
 
-### CDN
+### CDN (Recommended)
 ```html
-<script src="https://cdn.jsdelivr.net/npm/a11y-form-validator-lib@latest/standalone-validator.js"></script>
+<!-- Site Authentication Key -->
+<meta name="a11y-site-key" content="YOUR_SITE_KEY_HERE">
+
+<!-- A11y Form Validator -->
+<script defer src="https://cdn.a11yformvalidator.com/latest/standalone-validator-v2.js" crossorigin="anonymous"></script>
 ```
+
+**Note:** Get your site key from the [A11y Form Validator Extension](https://webflow.com/apps) or [Dashboard](https://app.a11yformvalidator.com).
 
 ## 🚀 Quick Start
 
-### Add to Page Settings
+### Add to Site Settings (Recommended for Site-Wide Validation)
 ```html
+<!-- Step 1: Add your site authentication key -->
+<meta name="a11y-site-key" content="YOUR_SITE_KEY_HERE">
 
-    <!-- Required dependencies -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.21.0/jquery.validate.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.21.0/additional-methods.min.js"></script>
-    
-    <!-- A11y Form Validator -->
-    <script src="https://cdn.jsdelivr.net/npm/a11y-form-validator-lib@latest/standalone-validator.js"></script>
+<!-- Step 2: Load A11y Form Validator from CDN -->
+<script 
+    defer 
+    src="https://cdn.a11yformvalidator.com/latest/standalone-validator-v2.js"
+    crossorigin="anonymous">
+</script>
 ```
 
-
 ### Webflow Integration
-1. Add the script to your Webflow site's custom code
-2. Ensure your forms have proper field types and required attributes
-3. The validator will automatically detect and validate forms
+1. Install the [A11y Form Validator Extension](https://webflow.com/apps) from the Webflow marketplace
+2. Click "Generate & Copy Validation Script" button in the extension
+3. Open Site Settings in Webflow Designer (gear icon in left sidebar)
+4. Navigate to the "Custom Code" tab
+5. Paste the script into the "Footer Code" section (applies to all pages)
+6. Save and publish your site
+7. The validator will automatically detect and validate all forms across your site
+
+**The extension automatically generates and includes your site key!**
 
 ## 🔧 Supported Field Types
 
