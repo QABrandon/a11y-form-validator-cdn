@@ -1,1 +1,625 @@
-(function(){'use strict';console.log('🔧 A11y Form Validator – CDN v1.0.31');var HAS_VALID_LICENSE=false;var STYLES_INJECTED=false;var BASE_ALLOWED_DOMAINS=[ 'webflow.io','webflow.com','netlify.app','vercel.app','github.io','localhost','127.0.0.1' ];var dynamicAllowedDomains=[];var domainsLoaded=false;function hostMatchesAllowed(hostname,domain){if(domain==='localhost' || domain==='127.0.0.1')return hostname===domain;if(hostname===domain)return true;return hostname.endsWith('.' + domain);}async function fetchCustomDomains(){try{var siteId=window.WEBFLOW_SITE_ID || document.querySelector('meta[name="webflow-site-id"]')?.content || extractSiteIdFromUrl();if(!siteId)return [];var resp=await fetch('https:if(!resp.ok)return [];var data=await resp.json();var names=[];(data.custom_domains || []).forEach(function(d){if(typeof d==='string')names.push(d);else if(d && d.name)names.push(d.name);});(data.domains || []).forEach(function(d){if(typeof d==='string' && names.indexOf(d)===-1)names.push(d);});return names;}catch(e){return [];}}function extractSiteIdFromUrl(){var h=window.location.hostname;return h.endsWith('.webflow.io')? h.replace('.webflow.io',''):null;}async function validateDomain(){if(!domainsLoaded){dynamicAllowedDomains=await fetchCustomDomains();domainsLoaded=true;}var hostname=window.location.hostname;var allowed=BASE_ALLOWED_DOMAINS.concat(dynamicAllowedDomains);var ok=allowed.some(function(d){return hostMatchesAllowed(hostname,d);});if(!ok){console.error('🚫 Unauthorized domain:',hostname,'Allowed:',allowed);return false;}return true;}function validateLicense(){var k=window.A11Y_LICENSE_KEY || document.querySelector('meta[name="a11y-license"]')?.content || document.querySelector('meta[name="a11y-form-validator-license"]')?.content;if(!k || k.length < 10)return false;return true;}async function initializeSecurity(){var domainValid=await validateDomain();if(!domainValid)return false;HAS_VALID_LICENSE=validateLicense();return true;}function getFieldLabel(field){var id=field.getAttribute('id');if(id){var lbl=document.querySelector('label[for="' + id + '"]');if(lbl && lbl.textContent.trim())return lbl.textContent.trim();}var by=field.getAttribute('aria-labelledby');if(by){var el=document.getElementById(by);if(el && el.textContent.trim())return el.textContent.trim();}var a=field.getAttribute('aria-label');if(a)return a;var d=field.getAttribute('data-field-label');if(d)return d;var n=field.getAttribute('name');if(n)return n.replace(/[-_]/g,' ').replace(/\b\w/g,function(m){return m.toUpperCase();});return 'This field';}function fieldMessage(type,fieldLabel,ctx){ctx=ctx ||{};var map={required:'{f}is required',email:'{f}must be a valid email address',phone:'{f}must be a valid phone number',url:'{f}must be a valid URL',minlength:'{f}must be at least{min}characters long',maxlength:'{f}must be no more than{max}characters long',pattern:'{f}format is invalid'};var msg=map[type] || 'Please check{f}';return msg.replace('{f}',fieldLabel).replace('{min}',ctx.min || '').replace('{max}',ctx.max || '');}function ensureSlot(field){var errorId=field.getAttribute('data-error-id');var slot=errorId ? document.getElementById(errorId):null;console.log('🔧 ensureSlot for field:',field.name || field.id,{hasErrorId:!!errorId,errorId:errorId,hasNeedsErrorContainer:field.hasAttribute('data-needs-error-container'),existingSlot:!!slot});if(!slot && field.hasAttribute('data-needs-error-container')){if(!errorId){errorId='a11y-error-' +(field.name || field.id || 'field')+ '-' + Date.now();field.setAttribute('data-error-id',errorId);console.log(' Created new error ID:',errorId);}slot=document.createElement('div');slot.id=errorId;slot.className='a11y-error-message';slot.setAttribute('aria-live','polite');field.insertAdjacentElement('afterend',slot);console.log(' Created error container element:',slot);}return slot || null;}function showError(field,message){console.log('🚨 showError called for field:',field.name || field.id,'message:',message);var slot=ensureSlot(field);if(slot){slot.textContent=message;slot.style.display='';console.log(' Error message displayed in slot:',slot.id);}else{console.log(' No error slot available for field');}field.setAttribute('aria-invalid','true');if(slot && slot.id){var ids=(field.getAttribute('aria-describedby')|| '').split(/\s+/).filter(Boolean);if(ids.indexOf(slot.id)===-1)ids.push(slot.id);field.setAttribute('aria-describedby',ids.join(' '));console.log(' Set aria-describedby to:',field.getAttribute('aria-describedby'));}}function hideError(field){var id=field.getAttribute('data-error-id');if(id){var slot=document.getElementById(id);if(slot)slot.textContent='';}field.removeAttribute('aria-invalid');field.removeAttribute('aria-describedby');}function isValidEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);}function isValidPhone(v){return /^[0-9\s\-\(\)\+]{10,}$/.test(v);}function isValidUrl(u){try{new URL(u);return true;}catch(e){return false;}}function validateFieldVanilla(field){console.log('🔍 validateFieldVanilla called for:',field.name || field.id,'value:',field.value);hideError(field);var label=getFieldLabel(field);var tag=field.tagName.toLowerCase();var type=(field.type || '').toLowerCase();console.log(' Field details:',{label,tag,type,required:field.hasAttribute('required')});if((type==='radio' || type==='checkbox')&& field.hasAttribute('required')){var group=field.form && field.name ? field.form.querySelectorAll('[name="'+field.name+'"]'):null;if(group && !Array.prototype.some.call(group,function(g){return g.checked;})){showError(field,fieldMessage('required',label));return false;}return true;}var val=(field.value || '').trim();if(field.hasAttribute('required')&& !val){showError(field,fieldMessage('required',label));return false;}if(type==='email' && val && !isValidEmail(val)){showError(field,fieldMessage('email',label));return false;}if(type==='tel' && val && !isValidPhone(val)){showError(field,fieldMessage('phone',label));return false;}if(type==='url' && val && !isValidUrl(val)){showError(field,fieldMessage('url',label));return false;}var min=field.getAttribute('minlength');if(min && val && val.length < +min){showError(field,fieldMessage('minlength',label,{min:min}));return false;}var max=field.getAttribute('maxlength');if(max && val && val.length > +max){showError(field,fieldMessage('maxlength',label,{max:max}));return false;}var pat=field.getAttribute('pattern');if(pat && val && !(new RegExp(pat).test(val))){showError(field,fieldMessage('pattern',label));return false;}return true;}function bindWithJQuery($form){$form.attr('novalidate','');$form.on('invalid',function(e){e.preventDefault();},true);var a11yFields=$form.find(':input[name]').filter(function(){return this.hasAttribute('required')|| this.hasAttribute('data-field-label')|| this.hasAttribute('data-a11y-validator')|| this.hasAttribute('data-needs-error-container');});console.log('🔍 jQuery mode - Found',a11yFields.length,'fields with A11y validator attributes');a11yFields.each(function(i,f){console.log(' Field',i + 1,':',f.name || f.id || 'unnamed',{type:f.type,hasRequired:f.hasAttribute('required'),hasDataFieldLabel:f.hasAttribute('data-field-label'),hasDataA11yValidator:f.hasAttribute('data-a11y-validator'),hasDataNeedsErrorContainer:f.hasAttribute('data-needs-error-container'),hasDataErrorId:f.hasAttribute('data-error-id')});});a11yFields.each(function(){var $el=$(this);var r={},m={};if(this.hasAttribute('required')){r.required=true;m.required=fieldMessage('required',getFieldLabel(this));}var t=(this.type || '').toLowerCase();if(t==='email')r.email=true;if(t==='url')r.url=true;var min=this.getAttribute('minlength');if(min)r.minlength=+min;var max=this.getAttribute('maxlength');if(max)r.maxlength=+max;var pat=this.getAttribute('pattern');if(pat)r.pattern=pat;if(!$.isEmptyObject(r)){$el.rules('add',r);if(!$.isEmptyObject(m))$el.rules('add',{messages:m});}});$form.validate({ignore:[],focusInvalid:true,errorElement:'div',errorClass:'a11y-error-message',errorPlacement:function(error,element){var $el=$(element);var id=$el.attr('data-error-id');var $slot=id ? $('#' + id):$();if(!$slot.length && $el.is('[data-needs-error-container]')){if(!id){id='a11y-error-' +($el.attr('name')|| $el.attr('id')|| 'field')+ '-' + Date.now();$el.attr('data-error-id',id);}$slot=$('<div>',{id:id,'aria-live':'polite','class':'a11y-error-message'}).insertAfter($el);}if($el.is(':radio,:checkbox')){var group=$form.find(':input[name="'+$el.attr('name')+'"]');var $first=$(group.get(0));if(!$slot.length){var fid=$first.attr('data-error-id');$slot=fid ? $('#'+fid):$();if(!$slot.length && $first.is('[data-needs-error-container]')){fid='a11y-error-' +($first.attr('name')|| $first.attr('id')|| 'field')+ '-' + Date.now();$first.attr('data-error-id',fid);$slot=$('<div>',{id:fid,'aria-live':'polite','class':'a11y-error-message'}).insertAfter($first);}}if($slot.length)$slot.empty().append(error);else error.insertAfter($first);setAria($first,$slot,true);}else{if($slot.length)$slot.empty().append(error);else error.insertAfter($el);setAria($el,$slot,true);}},highlight:function(el){var $el=$(el);var $slot=$el.attr('data-error-id')? $('#'+$el.attr('data-error-id')):$();setAria($el,$slot,true);},unhighlight:function(el){var $el=$(el);var id=$el.attr('data-error-id');if(id){var $slot=$('#'+id);if($slot.length)$slot.empty();}setAria($el,null,false);},invalidHandler:function(e,v){if(v.errorList && v.errorList.length){v.errorList[0].element.focus();}var $status=$form.find('[role="status"],[aria-live]').first();if($status.length)$status.text('Please fix the highlighted errors.');}});function setAria($el,$slot,hasError){if(!hasError){$el.removeAttr('aria-invalid aria-describedby');return;}$el.attr('aria-invalid','true');if($slot && $slot.length){var id=$slot.attr('id');var d=($el.attr('aria-describedby')|| '').split(/\s+/).filter(Boolean);if(d.indexOf(id)===-1)d.push(id);$el.attr('aria-describedby',d.join(' '));}}}function bindVanilla(form){form.setAttribute('novalidate','novalidate');form.addEventListener('invalid',function(e){e.preventDefault();e.stopPropagation();},true);var fields=Array.prototype.filter.call(form.querySelectorAll('input,textarea,select'),function(f){var t=(f.type || '').toLowerCase();var allowed=(t==='email' || t==='tel' || t==='url' || t==='text')|| f.tagName.toLowerCase()==='textarea' || t==='radio' || t==='checkbox';var hasAny=f.hasAttribute('required')|| f.hasAttribute('data-field-label')|| f.hasAttribute('data-a11y-validator')|| f.hasAttribute('data-needs-error-container');return allowed && hasAny;});console.log('🔍 Vanilla mode - Found',fields.length,'fields with A11y validator attributes');fields.forEach(function(f,i){console.log(' Field',i + 1,':',f.name || f.id || 'unnamed',{type:f.type,hasRequired:f.hasAttribute('required'),hasDataFieldLabel:f.hasAttribute('data-field-label'),hasDataA11yValidator:f.hasAttribute('data-a11y-validator'),hasDataNeedsErrorContainer:f.hasAttribute('data-needs-error-container'),hasDataErrorId:f.hasAttribute('data-error-id')});});fields.forEach(function(f){if(!f.getAttribute('data-error-id')&& f.hasAttribute('data-needs-error-container')){f.setAttribute('data-error-id','a11y-error-' +(f.name || f.id || 'field')+ '-' + Date.now());}f.addEventListener('blur',function(){validateFieldVanilla(f);});f.addEventListener('input',function(){hideError(f);});f.addEventListener('focus',function(){hideError(f);});});function onSubmit(e){console.log('📝 Form submit event triggered');var ok=true,firstErr=null;fields.forEach(function(f){var valid=validateFieldVanilla(f);if(!valid && !firstErr)firstErr=f;ok=ok && valid;});console.log(' Form validation result:',{valid:ok,firstError:firstErr ?(firstErr.name || firstErr.id):null});if(!ok){e.preventDefault();e.stopPropagation();console.log(' Form submission prevented,focusing first error field');firstErr && firstErr.focus();}else{console.log(' Form validation passed,allowing submission');}}form.addEventListener('submit',onSubmit);}function injectStyles(){if(STYLES_INJECTED)return;var style=document.createElement('style');style.id='a11y-form-validator-styles';style.textContent='\ \ .a11y-error-message{\ display:block;\ margin-top:8px;\ font-size:14px;\ line-height:1.4;\ color:#721c24;\ background-color:#f8d7da;\ border:1px solid #f5c6cb;\ padding:8px 12px;\ border-radius:4px;\ font-weight:600;\ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;\}\ \ \ [aria-invalid="true"]{\ outline:2px solid #b00020;\ outline-offset:2px;\}\ \ \ .sr-only{\ position:absolute!important;\ width:1px;height:1px;\ padding:0;margin:-1px;overflow:hidden;\ clip:rect(0,0,0,0);white-space:nowrap;border:0;\}';document.head.appendChild(style);STYLES_INJECTED=true;console.log('✅ A11y Form Validator styles injected');}async function initializeValidation(){var allowed=await initializeSecurity();if(!allowed)return;injectStyles();var forms=document.querySelectorAll('form');if(!forms.length)return;var hasJQ=!!(window.jQuery && window.jQuery.validator);if(hasJQ){window.jQuery(function(){forms.forEach(function(f){bindWithJQuery(window.jQuery(f));});});}else{forms.forEach(bindVanilla);}console.log('✅ A11y Form Validator initialized for',forms.length,'form(s). Mode:',hasJQ ? 'jQuery':'Vanilla');}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initializeValidation);}else{initializeValidation();}})();
+(function() {
+    'use strict';
+    
+    console.log('🔧 A11y Form Validator - Standalone Script Loading... v1.0.30');
+    
+    // Check for jQuery dependency
+    if (typeof window.jQuery === 'undefined') {
+        console.warn('⚠️ jQuery not detected. Enhanced validation features may not work properly.');
+        console.warn('⚠️ Please ensure jQuery and jQuery Validation are loaded before this script.');
+        console.warn('⚠️ Required dependencies:');
+        console.warn(' - https://code.jquery.com/jquery-3.7.1.min.js');
+        console.warn(' - https://cdn.jsdelivr.net/npm/jquery-validation@1.21.0/dist/jquery.validate.min.js');
+    } else {
+        console.log('✅ jQuery detected, enhanced validation features available');
+    }
+    
+    // Domain validation
+    const ALLOWED_DOMAINS = [
+        'webflow.io',
+        'webflow.com',
+        'netlify.app',
+        'vercel.app',
+        'github.io'
+    ];
+    
+    function validateDomain() {
+        const hostname = window.location.hostname;
+        const isAllowed = ALLOWED_DOMAINS.some(domain => hostname.includes(domain));
+        
+        if (!isAllowed) {
+            console.error('🚫 Unauthorized domain:', hostname);
+            console.warn('A11y Form Validator is only authorized for specific domains');
+            return false;
+        }
+        
+        console.log('✅ Domain validation passed:', hostname);
+        return true;
+    }
+    
+    // License validation
+    function validateLicense() {
+        const licenseKey = window.A11Y_LICENSE_KEY || 
+            document.querySelector('meta[name="a11y-license"]')?.content ||
+            document.querySelector('meta[name="a11y-form-validator-license"]')?.content;
+        
+        if (!licenseKey) {
+            console.warn('⚠️ No license key found - using fallback validation only');
+            return false;
+        }
+        
+        if (licenseKey.length < 10) {
+            console.warn('⚠️ Invalid license key format');
+            return false;
+        }
+        
+        console.log('✅ License validation passed');
+        return true;
+    }
+    
+    // Enhanced initialization with API calls
+    async function initializeWithApiCalls() {
+        // Validate domain with custom domains
+        const domainValid = await validateDomainWithCustomDomains();
+        if (!domainValid) {
+            console.error('🚫 A11y Form Validator blocked - unauthorized domain');
+            return false;
+        }
+        
+        // Fetch user configuration for plan features
+        const userConfig = await fetchUserConfig();
+        if (userConfig) {
+            console.log('✅ User configuration loaded:', userConfig);
+            // Apply user-specific features based on plan
+        }
+        
+        return true;
+    }
+    
+    const hasValidLicense = validateLicense();
+    
+    // Configuration - Essential API calls for domain validation and user features
+    const API_BASE_URL = 'https://app.a11yformvalidator.com';
+    
+    // Cache management for API calls
+    let domainCache = null;
+    let userConfigCache = null;
+    
+    // Error messages
+    const errorMessages = {
+        required: 'This field is required',
+        email: 'Please enter a valid email address',
+        phone: 'Please enter a valid phone number',
+        url: 'Please enter a valid URL',
+        number: 'Please enter a valid number',
+        date: 'Please enter a valid date',
+        minlength: 'Please enter at least {min} characters',
+        maxlength: 'Please enter no more than {max} characters'
+    };
+    
+    // ===== ESSENTIAL API FUNCTIONS =====
+    
+    // Extract site ID from URL
+    function extractSiteIdFromUrl() {
+        const hostname = window.location.hostname;
+        return hostname.endsWith('.webflow.io') ? hostname.replace('.webflow.io', '') : null;
+    }
+    
+    // Fetch custom domains for site validation
+    async function fetchCustomDomains() {
+        if (domainCache) return domainCache;
+        
+        try {
+            const siteId = window.WEBFLOW_SITE_ID || 
+                          document.querySelector('meta[name="webflow-site-id"]')?.content ||
+                          extractSiteIdFromUrl();
+            
+            if (!siteId) {
+                console.warn('⚠️ No site ID found for domain validation');
+                return [];
+            }
+            
+            console.log('🔍 Fetching custom domains for site:', siteId);
+            
+            const response = await fetch(`${API_BASE_URL}/api/sites/domain-info/${siteId}`);
+            
+            if (!response.ok) {
+                console.warn('⚠️ Failed to fetch custom domains:', response.status);
+                return [];
+            }
+            
+            const data = await response.json();
+            const domains = [];
+            
+            // Extract domain names
+            (data.custom_domains || []).forEach(d => {
+                if (typeof d === 'string') domains.push(d);
+                else if (d && d.name) domains.push(d.name);
+            });
+            
+            (data.domains || []).forEach(d => {
+                if (typeof d === 'string' && !domains.includes(d)) domains.push(d);
+            });
+            
+            domainCache = domains;
+            console.log('✅ Fetched custom domains:', domains);
+            return domains;
+            
+        } catch (error) {
+            console.warn('⚠️ Error fetching custom domains:', error);
+            return [];
+        }
+    }
+    
+    // Fetch user configuration and plan features
+    async function fetchUserConfig() {
+        if (userConfigCache) return userConfigCache;
+        
+        try {
+            const siteId = window.WEBFLOW_SITE_ID || 
+                          document.querySelector('meta[name="webflow-site-id"]')?.content ||
+                          extractSiteIdFromUrl();
+            
+            if (!siteId) {
+                console.warn('⚠️ No site ID found for user config');
+                return null;
+            }
+            
+            console.log('🔍 Fetching user configuration for site:', siteId);
+            
+            const response = await fetch(`${API_BASE_URL}/api/sites/${siteId}/config`);
+            
+            if (!response.ok) {
+                console.warn('⚠️ Failed to fetch user config:', response.status);
+                return null;
+            }
+            
+            const config = await response.json();
+            userConfigCache = config;
+            console.log('✅ Fetched user configuration:', config);
+            return config;
+            
+        } catch (error) {
+            console.warn('⚠️ Error fetching user config:', error);
+            return null;
+        }
+    }
+    
+    // Enhanced domain validation with custom domains
+    async function validateDomainWithCustomDomains() {
+        const baseAllowedDomains = [
+            'webflow.io',
+            'webflow.com', 
+            'netlify.app',
+            'vercel.app',
+            'github.io'
+        ];
+        
+        const customDomains = await fetchCustomDomains();
+        const allAllowedDomains = [...baseAllowedDomains, ...customDomains];
+        
+        const hostname = window.location.hostname;
+        const isAllowed = allAllowedDomains.some(domain => {
+            if (domain === hostname) return true;
+            return hostname.endsWith('.' + domain);
+        });
+        
+        if (!isAllowed) {
+            console.error('🚫 Unauthorized domain:', hostname);
+            console.warn('Allowed domains:', allAllowedDomains);
+            return false;
+        }
+        
+        console.log('✅ Domain validation passed:', hostname);
+        return true;
+    }
+    
+    // ===== SIMPLIFIED VALIDATION (MATCHES WORKING DIRECT INJECT) =====
+    // Attribute-based validation with essential API calls for domain/user validation
+    
+    // Get field label
+    function getFieldLabel(field) {
+        const fieldId = field.getAttribute('id');
+        if (fieldId) {
+            const labelElement = document.querySelector('label[for="' + fieldId + '"]');
+            if (labelElement && labelElement.textContent.trim()) {
+                return labelElement.textContent.trim();
+            }
+        }
+        
+        const ariaLabelledBy = field.getAttribute('aria-labelledby');
+        if (ariaLabelledBy) {
+            const labelElement = document.getElementById(ariaLabelledBy);
+            if (labelElement && labelElement.textContent.trim()) {
+                return labelElement.textContent.trim();
+            }
+        }
+        
+        const ariaLabel = field.getAttribute('aria-label');
+        if (ariaLabel) {
+            return ariaLabel;
+        }
+        
+        const dataLabel = field.getAttribute('data-field-label');
+        if (dataLabel) {
+            return dataLabel;
+        }
+        
+        const fieldName = field.getAttribute('name');
+        if (fieldName) {
+            return fieldName.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+        
+        return 'This field';
+    }
+    
+    // Get field-specific error message
+    function getFieldSpecificMessage(messageType, fieldLabel, context = {}) {
+        const templates = {
+            required: '{fieldLabel} is required',
+            email: '{fieldLabel} must be a valid email address (name@company.com)',
+            phone: '{fieldLabel} must be a valid phone number (US & CA: (555) 123-4567)',
+            url: '{fieldLabel} must be a valid URL (https://example.com)',
+            minlength: '{fieldLabel} must be at least {min} characters long',
+            maxlength: '{fieldLabel} must be no more than {max} characters long'
+        };
+        
+        let message = templates[messageType] || 'Please check {fieldLabel}';
+        message = message.replace('{fieldLabel}', fieldLabel);
+        message = message.replace('{min}', context.min || '');
+        message = message.replace('{max}', context.max || '');
+        
+        return message;
+    }
+    
+    // Validate individual field
+    function validateField(field) {
+        clearFieldError(field);
+        
+        let isValid = true;
+        let errorMessage = '';
+        const fieldLabel = getFieldLabel(field);
+        
+        // Required field validation
+        if (field.hasAttribute('required') && !field.value.trim()) {
+            isValid = false;
+            errorMessage = getFieldSpecificMessage('required', fieldLabel);
+        }
+        
+        // Email validation
+        if (field.type === 'email' && field.value) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(field.value)) {
+                isValid = false;
+                errorMessage = getFieldSpecificMessage('email', fieldLabel);
+            }
+        }
+        
+        // Phone validation
+        if (field.type === 'tel' && field.value) {
+            const phoneRegex = /^[0-9\s\-\(\)\+]{10,}$/;
+            if (!phoneRegex.test(field.value)) {
+                isValid = false;
+                errorMessage = getFieldSpecificMessage('phone', fieldLabel);
+            }
+        }
+        
+        // URL validation
+        if (field.type === 'url' && field.value) {
+            try {
+                new URL(field.value);
+            } catch (e) {
+                isValid = false;
+                errorMessage = getFieldSpecificMessage('url', fieldLabel);
+            }
+        }
+        
+        // Textarea validation
+        if (field.tagName.toLowerCase() === 'textarea' && 
+            field.hasAttribute('required') && 
+            !field.value.trim()) {
+            isValid = false;
+            errorMessage = getFieldSpecificMessage('required', fieldLabel);
+        }
+        
+        if (!isValid && errorMessage) {
+            showError(field, errorMessage);
+        }
+        
+        return isValid;
+    }
+    
+    // Clear field error
+    function clearFieldError(field) {
+        hideError(field);
+        field.removeAttribute('aria-invalid');
+        field.removeAttribute('aria-describedby');
+    }
+    
+    // Show error message
+    function showError(field, message) {
+        let errorId = field.getAttribute('data-error-id');
+        if (!errorId) {
+            errorId = `a11y-error-${field.name || field.id || 'field'}-${Date.now()}`;
+            field.setAttribute('data-error-id', errorId);
+        }
+        
+        let errorElement = document.getElementById(errorId);
+        if (!errorElement) {
+            errorElement = document.createElement('div');
+            errorElement.id = errorId;
+            errorElement.setAttribute('role', 'alert');
+            errorElement.className = 'a11y-error-message';
+            
+            const fieldParent = field.parentElement;
+            if (fieldParent) {
+                fieldParent.insertBefore(errorElement, field.nextSibling);
+            }
+        }
+        
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        errorElement.style.color = '#721c24';
+        errorElement.style.backgroundColor = '#f8d7da';
+        errorElement.style.border = '1px solid #f5c6cb';
+        errorElement.style.padding = '8px 12px';
+        errorElement.style.borderRadius = '4px';
+        errorElement.style.marginTop = '8px';
+        errorElement.style.fontSize = '14px';
+        errorElement.style.fontWeight = '600';
+        errorElement.style.lineHeight = '1.4';
+        errorElement.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif';
+        
+        field.setAttribute('aria-invalid', 'true');
+        field.setAttribute('aria-describedby', errorId);
+        
+        console.log('✅ Error message displayed:', message, 'for field:', field.name || field.id);
+    }
+    
+    // Hide error message
+    function hideError(field) {
+        const errorId = field.getAttribute('data-error-id');
+        if (!errorId) return;
+        
+        const errorElement = document.getElementById(errorId);
+        if (errorElement) {
+            errorElement.style.display = 'none';
+        }
+        
+        field.removeAttribute('aria-invalid');
+        field.removeAttribute('aria-describedby');
+        
+        console.log('✅ Error message hidden for field:', field.name || field.id);
+    }
+    
+    // Update character count (placeholder for future functionality)
+    function updateCharacterCount(field) {
+        return;
+    }
+    
+    // Announce to screen reader
+    function announceToScreenReader(message) {
+        const announcement = document.createElement('div');
+        announcement.setAttribute('aria-live', 'assertive');
+        announcement.setAttribute('aria-atomic', 'true');
+        announcement.style.position = 'absolute';
+        announcement.style.left = '-10000px';
+        announcement.style.width = '1px';
+        announcement.style.height = '1px';
+        announcement.style.overflow = 'hidden';
+        announcement.textContent = message;
+        
+        document.body.appendChild(announcement);
+        
+        setTimeout(() => {
+            if (announcement.parentNode) {
+                announcement.parentNode.removeChild(announcement);
+            }
+        }, 1000);
+    }
+    
+    // Validation helper functions
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+    
+    function isValidPhone(phone) {
+        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+        const cleanPhone = phone.replace(/[\s\-\(\)\.]/g, '');
+        return phoneRegex.test(cleanPhone);
+    }
+    
+    function isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    // Initialize form validation
+    function initializeFormValidation(form) {
+        const formId = form.id || form.name || 'default';
+        console.log('🔧 Initializing validation for form:', formId);
+        
+        // Disable HTML5 validation
+        form.setAttribute('novalidate', 'novalidate');
+        console.log('✅ Disabled HTML5 validation for form:', formId);
+        
+        const allFields = form.querySelectorAll('input, textarea, select');
+        console.log('🔍 Found', allFields.length, 'total fields in form:', formId);
+        
+        // Remove autofocus attributes
+        allFields.forEach(field => {
+            if (field.hasAttribute('autofocus')) {
+                field.removeAttribute('autofocus');
+                console.log('🔧 Removed autofocus from field:', field.name || field.id);
+            }
+        });
+        
+        // Filter fields that need validation - match working direct inject logic
+        const fields = [];
+        for (const field of allFields) {
+            const isAllowedType = field.type === 'email' || 
+                                 field.type === 'tel' || 
+                                 field.type === 'url' || 
+                                 field.type === 'text' || 
+                                 field.tagName.toLowerCase() === 'textarea';
+            
+            const hasRequired = field.hasAttribute('required');
+            const hasDataLabel = field.hasAttribute('data-field-label');
+            const hasDataErrorId = field.hasAttribute('data-error-id');
+            const hasAutoError = field.hasAttribute('data-auto-error-messaging');
+            const hasErrorContainer = field.hasAttribute('data-needs-error-container');
+            
+            // Only include fields that have validation attributes (match working direct inject logic + error container)
+            if (isAllowedType && (hasRequired || hasDataLabel || hasDataErrorId || hasAutoError || hasErrorContainer)) {
+                fields.push(field);
+            }
+        }
+        
+        console.log('📋 Found', fields.length, 'fields that need validation in form:', formId);
+        
+        // Setup field validation
+        fields.forEach((field, fieldIndex) => {
+            const fieldName = field.name || field.id || `field-${fieldIndex}`;
+            
+            if (!field.getAttribute('data-error-id')) {
+                const errorId = `a11y-error-${fieldName}-${Date.now()}`;
+                field.setAttribute('data-error-id', errorId);
+            }
+            
+            console.log('🔧 Setting up validation for field:', fieldName, 'in form:', formId);
+            
+            field.addEventListener('blur', function() {
+                validateField(this);
+            });
+            
+            field.addEventListener('input', function() {
+                clearFieldError(this);
+            });
+            
+            field.addEventListener('focus', function() {
+                clearFieldError(this);
+            });
+        });
+        
+        // Form submission handler
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('🔧 Form submission intercepted for form:', formId);
+            
+            if (validateForm()) {
+                console.log('✅ Form validation passed, submitting form:', formId);
+                form.removeEventListener('submit', arguments.callee);
+                form.submit();
+            } else {
+                console.log('❌ Form validation failed for form:', formId);
+                focusFirstError();
+            }
+        });
+        
+        // Validate entire form
+        function validateForm() {
+            let isValid = true;
+            let firstErrorField = null;
+            
+            console.log('🔧 Validating form with', fields.length, 'allowed fields');
+            
+            fields.forEach(field => {
+                if (!validateField(field)) {
+                    isValid = false;
+                    if (!firstErrorField) {
+                        firstErrorField = field;
+                    }
+                }
+            });
+            
+            if (!isValid && firstErrorField) {
+                console.log('❌ Form validation failed, first error field:', firstErrorField.name || firstErrorField.id);
+                
+                // Remove autofocus from all fields
+                const allFields = form.querySelectorAll('input, textarea, select');
+                allFields.forEach(field => {
+                    if (field.hasAttribute('autofocus')) {
+                        field.removeAttribute('autofocus');
+                        console.log('🔧 Removed autofocus from field:', field.name || field.id);
+                    }
+                });
+                
+                announceToScreenReader('Form submission failed. Please correct the errors and try again.');
+            } else {
+                console.log('✅ Form validation passed');
+            }
+            
+            return isValid;
+        }
+        
+        // Focus first error field
+        function focusFirstError() {
+            const firstErrorField = form.querySelector('[aria-invalid="true"]');
+            if (firstErrorField) {
+                console.log('🔧 First error field identified:', firstErrorField.name || firstErrorField.id);
+                
+                // Remove autofocus from all fields
+                const allFields = form.querySelectorAll('input, textarea, select');
+                allFields.forEach(field => {
+                    if (field.hasAttribute('autofocus')) {
+                        field.removeAttribute('autofocus');
+                        console.log('🔧 Removed autofocus from field:', field.name || field.id);
+                    }
+                });
+                
+                console.log('ℹ️ User should interact with error field naturally');
+            } else {
+                console.log('ℹ️ No error fields found');
+            }
+        }
+    }
+    
+    // Initialize validation for all forms
+    function initializeValidation() {
+        const forms = document.querySelectorAll('form');
+        
+        if (forms.length === 0) {
+            console.log('ℹ️ No forms found on page, skipping validation initialization');
+            return;
+        }
+        
+        console.log('📋 Found', forms.length, 'form(s) on page, initializing validation for all forms');
+        
+        forms.forEach(form => {
+            initializeFormValidation(form);
+        });
+        
+        console.log('✅ A11y Form Validator initialized successfully for', forms.length, 'form(s)');
+    }
+    
+    // Enhanced initialization with API calls
+    async function initializeWithApiValidation() {
+        // First, validate domain and fetch user config
+        const apiInitialized = await initializeWithApiCalls();
+        if (!apiInitialized) {
+            console.error('❌ API initialization failed, skipping validation');
+            return;
+        }
+        
+        // Then initialize form validation
+        initializeValidation();
+    }
+    
+    // Wait for DOM to be ready
+    function waitForDOM() {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeWithApiValidation);
+        } else {
+            initializeWithApiValidation();
+        }
+    }
+    
+    waitForDOM();
+})();
